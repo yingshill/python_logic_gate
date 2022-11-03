@@ -5,6 +5,10 @@ Instructor's solution
 """
 
 
+# Classes that have "has-a" relationship with logic gates(AndGate, OrGate...)
+# E.g. AndGate has Input, Output and CostMixin
+
+
 class Input:
     """A class representing an input"""
 
@@ -86,7 +90,7 @@ class Output:
 class CostMixin:
     """ A class expands logic gates capacity like querying the cost """
 
-    COST_MULTIPILER = 10
+    COST_MULTIPLIER = 10
     
     def __init__(self, number_of_components):
         self._number_of_components = number_of_components
@@ -98,7 +102,34 @@ class CostMixin:
 
     @property
     def cost(self):
-        self._cost = COST_MULTIPILER * (self._number_of_components ** 2)
+        self._cost = CostMixin.COST_MULTIPLIER * (self._number_of_components ** 2)
+        return self._cost
+
+# Classes that have "is-a" relationship with logic gates(AndGate, OrGate...)
+# E.g. AndGate is a LogicGate(), is a NodeMixin()
+
+class NodeMixin:
+    """ A class that can link multiple logic gates together in the Circuit class """
+    """ Similar with the dataStack class in the lecture """
+
+    def __init__(self):
+        self._next = None
+
+    @property
+    def next(self):
+        if self._next:
+            return self._next
+        return None
+
+    @next.setter
+    def next(self, node):
+        if not isinstance(node, LogicGate):
+            raise TypeError(f"The input node {node} is not a LogicGate instance.")
+        self._next = node
+
+    def __str__(self):
+        return "Node id={}, next={}".format(
+            hex(id(self)), "(none)" if self.next is None else hex(id(self.next)))
 
 
 class LogicGate:
@@ -112,13 +143,19 @@ class LogicGate:
         return self._name
 
 
-class UnaryGate(LogicGate):
+class UnaryGate(LogicGate, NodeMixin):
     """A class representing logic gate with a single input."""
 
-    def __init__(self, name):
+    def __init__(self, name, circuit=None):
         super().__init__(name)
+        NodeMixin.__init__(self)
         self._input = Input(self)
         self._output = Output()
+        self._cost = CostMixin(2).cost
+        # test circuit is the right type
+        if not isinstance(circuit, Circuit):
+            raise TypeError(f"input circuit is not the right type")
+        circuit.add(self)
 
     def __str__(self):
         return (f"LogicGate {self.name}: input={self.input}, "
@@ -132,15 +169,25 @@ class UnaryGate(LogicGate):
     def output(self):
         return self._output
 
+    @property
+    def cost(self):
+        return self._cost
 
-class BinaryGate(LogicGate):
+
+class BinaryGate(LogicGate, NodeMixin):
     """A class representing logic gate with two inputs."""
 
-    def __init__(self, name):
+    def __init__(self, name,  circuit=None):
         super().__init__(name)
+        NodeMixin.__init__(self)
         self._input0 = Input(self)
         self._input1 = Input(self)
         self._output = Output()
+        self._cost = CostMixin(3).cost
+        # test circuit is the right type
+        if not isinstance(circuit, Circuit):
+            raise TypeError(f"input circuit is not the right type")
+        circuit.add(self)
 
     def __str__(self):
         return (f"LogicGate {self.name}: input0={self.input0}, "
@@ -158,8 +205,15 @@ class BinaryGate(LogicGate):
     def output(self):
         return self._output
 
+    @property
+    def cost(self):
+        return self._cost
+
+# Classes that are a specific gate
+
 
 class NotGate(UnaryGate):
+
     def evaluate(self):
         try:
             self.output.value = not self.input.value
@@ -195,6 +249,41 @@ class XorGate(BinaryGate):
         except AttributeError:
             pass
 
+# Class that keeps track of all logic gates belonging to a specific  circuit.
+
+class Circuit:
+    """ A class that keeps track of all logic gates belonging to a specific circuit """
+
+    def __init__(self):
+        self._cost = 0
+        # self._top = None
+
+    @property
+    def cost(self):
+        start = self._top
+        while start is not None:
+            self._cost += start.cost
+            start = start.next
+        return self._cost
+
+    def add(self, gate):
+        try:
+            if not isinstance(gate, NodeMixin):
+                raise TypeError(f"The input node is not the right type of NodeMixin")
+            gate.next = self._top
+            self._top = gate
+        except AttributeError:
+            self._top = gate
+
+
+    def __str__(self):
+        start = self._top
+        returned_str = ""
+        while start is not None:
+            returned_str += "(" + str(start) + ")"
+            start = start.next
+        return returned_str
+
 
 def test():
     """Umbrella test function"""
@@ -214,7 +303,8 @@ def test():
 
 
 def test_input():
-    input_ = Input(NotGate("test"))
+    circuit = Circuit()
+    input_ = Input(NotGate("test", circuit))
     print("Initially, input_ is:", input_)
     try:
         print(input_.value)
@@ -237,15 +327,19 @@ def test_output():
     print("After set to True, output is:", output)
 
 def test_not():
-    not_gate = NotGate("not")
+    circuit = Circuit()
+    not_gate = NotGate("not", circuit)
     not_gate.input.value = True
     print(not_gate)
     not_gate.input.value = False
     print(not_gate)
+    print(circuit)
+    print(circuit.cost)
 
 
 def test_and():
-    and_gate = AndGate("and")
+    circuit = Circuit()
+    and_gate = AndGate("and", circuit)
     print("AND gate initial state:", and_gate)
     and_gate.input0.value = True
     print("AND gate with 1 input set", and_gate)
@@ -253,10 +347,13 @@ def test_and():
     print("AND gate with 2 inputs set:", and_gate)
     and_gate.input1.value = True
     print("AND gate with 2 inputs set:", and_gate)
+    print(circuit)
+    print(circuit.cost)
 
 
 def test_or():
-    or_gate = OrGate("or")
+    circuit = Circuit()
+    or_gate = OrGate("or", circuit)
     or_gate.input0.value = False
     or_gate.input1.value = False
     print(or_gate)
@@ -265,7 +362,8 @@ def test_or():
 
 
 def test_xor():
-    xor_gate = XorGate("xor")
+    circuit = Circuit()
+    xor_gate = XorGate("xor", circuit)
     xor_gate.input0.value = False
     xor_gate.input1.value = False
     print(xor_gate)
@@ -274,29 +372,55 @@ def test_xor():
 
 
 def test_not_not():
-    not_gate1 = NotGate("not1")
-    not_gate2 = NotGate("not2")
+    circuit = Circuit()
+    not_gate1 = NotGate("not1", circuit)
+    not_gate2 = NotGate("not2", circuit)
+    print(f"After connection")
     not_gate1.output.connect(not_gate2.input)
     print(not_gate1)
     print(not_gate2)
-    print("Setting not-gate input to False...")
+    print("Setting not-not_gate1 input to False...")
     not_gate1.input.value = False
     print(not_gate1)
     print(not_gate2)
+    print(f"Cost of not_gate1 is {not_gate1.cost}")
+    print(f"Cost of NOT-NOT circuit is {circuit.cost}")
 
 
 def test_and_not():
-    and_gate = AndGate("and")
-    not_gate = NotGate("not")
+    circuit = Circuit()
+    and_gate = AndGate("and", circuit)
+    not_gate = NotGate("not", circuit)
+    print(f"After connection")
     and_gate.output.connect(not_gate.input)
+    print("Setting and_gate input0 to True and input1 to False")
     and_gate.input0.value = True
     and_gate.input1.value = False
     print(and_gate)
     print(not_gate)
+    print("Setting and_gate input1 to True")
     and_gate.input1.value = True
     print(and_gate)
     print(not_gate)
+    print(f"Cost of and_gate is {and_gate.cost}")
+    print(f"Cost of not_gate is {not_gate.cost}")
+    print(f"Cost of NOT-NOT circuit is {circuit.cost}")
+
+
+def full_adder(a, b, ci):
+    """ Function that builds the 1-bit full adder circuit """
+    circuit = Circuit()
+    xor_gate1 = XorGate("Xor Gate", circuit)
+    xor_gate2 = XorGate("Xor Gate", circuit)
+    xor_gate2.output.connect(xor_gate1.input0)
+    xor_gate2.output.connect(xor_gate1.input1)
+    xor_gate2.input0.value = a
+    xor_gate2.input1.value = b
+    sum = xor_gate1.output.value
+
 
 
 if __name__ == '__main__':
-    test()
+    # test()
+    full_adder(True, False, True)
+    # test_and_not()
