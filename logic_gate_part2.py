@@ -1,7 +1,6 @@
 """
-CS3B, Assignment #4, Logic gate simulation (Part 1)
-Copyright 2021 Zibin Yang
-Instructor's solution
+CS3B, Assignment #5, Logic gate simulation (Part 2)
+Yingshi Liu
 """
 
 
@@ -409,18 +408,46 @@ def test_and_not():
 
 def full_adder(a, b, ci):
     """ Function that builds the 1-bit full adder circuit """
+
+    # Get Sum
     circuit = Circuit()
     xor_gate1 = XorGate("Xor Gate", circuit)
     xor_gate2 = XorGate("Xor Gate", circuit)
     xor_gate2.output.connect(xor_gate1.input0)
-    xor_gate2.output.connect(xor_gate1.input1)
     xor_gate2.input0.value = a
     xor_gate2.input1.value = b
+    xor_gate1.input1.value = ci
+    # print(f"gate1: {xor_gate1}")
+    # print(f"gate2: {xor_gate2}")
     sum = xor_gate1.output.value
 
+    # Get Co
+    # 1st AndGate: ((a XOR b) and ci)
+    andgate1 = AndGate("and1", circuit)
+    andgate1.input0.value = xor_gate2.output.value
+    andgate1.input1.value = ci
+    print(f"((a XOR b) and ci): {andgate1}")
+
+    # 2nd AndGate: a AND b
+    andgate2 = AndGate("and2", circuit)
+    andgate2.input0.value = a
+    andgate2.input1.value = b
+    print(f"a AND b: {andgate2}")
+
+    # OrGate
+    orgate = OrGate("or", circuit)
+    andgate1.output.connect(orgate.input0)
+    andgate2.output.connect(orgate.input1)
+    co = orgate.output.value
+    print(f"orgate: {orgate}")
+    print(f"co: {co}")
+    print(f"sum co: {sum} {co}")
+
+    return (sum, co, circuit.cost)
 
 
 if __name__ == '__main__':
     # test()
-    full_adder(True, False, True)
+    result = full_adder(True, False, True)
+    print(result)
     # test_and_not()
