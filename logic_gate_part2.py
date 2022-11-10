@@ -59,6 +59,7 @@ class Output:
             raise TypeError("Output must be connected to an input")
         # If the input is not already in the list, add it; alternative is to
         # use a set.
+        # connect can trigger value change both direction
         if input_ not in self.connections:
             self.connections.append(input_)
         try:
